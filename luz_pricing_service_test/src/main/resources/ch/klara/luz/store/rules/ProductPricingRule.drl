@@ -1,0 +1,288 @@
+package ch.klara.luz.store.rules;
+
+import ch.klara.luz.store.model.ProductPricing;
+import ch.klara.luz.store.model.CustomerPricingModel;
+import ch.klara.luz.store.model.SubscriptionPricingModel;
+import java.lang.Number;
+
+dialect "mvel"
+dialect "java"
+
+rule "Price plan is SINGLE"
+salience 5
+	when
+		$productPricing : ProductPricing( pricePlan == "SINGLE" )
+	then
+		$productPricing.setPrice(5.0B);
+end
+
+rule "Price plan is SINGLE and product code is LOGISTIC"
+	when
+		$productPricing : ProductPricing( pricePlan == "SINGLE", productCode contains "LOGISTICS")
+	then
+		$productPricing.setPrice(4.0B);
+end
+
+rule "Price plan is VOLUME"
+salience 5
+    when
+        $productPricing: ProductPricing(pricePlan == "VOLUME", $volume : volume )
+    then
+        $productPricing.setPrice(3.0B * $volume);
+end
+
+rule "Product code is POS"
+    when
+        $productPricing: ProductPricing(productCode contains "POS" && pricePlan == "MONTHLY")
+    then
+        $productPricing.setPrice(49.0B);
+end
+
+/*****************************************************************
+ *
+ * BOOKING-3MA
+ *
+ ***************************************************************/
+
+rule "Product code is BOOKING-3MA and price plan MONTHLY"
+    when
+        $productPricing: ProductPricing(productCode contains "BOOKING-3MA" && pricePlan == "MONTHLY")
+    then
+        $productPricing.setPrice(85.0B);
+        $productPricing.setDiscount("")
+end
+
+rule "Product code is BOOKING-3MA and price plan MONTHLY and promotion code KLARA"
+    when
+        $productPricing: ProductPricing(productCode == "BOOKING-3MA", pricePlan == "MONTHLY", promotionCode == "KLARA")
+    then
+        $productPricing.setPrice(79.0B);
+        $productPricing.setDiscount("10%")
+end
+
+rule "Product code is BOOKING-3MA and price plan QUARTERLY"
+    when
+        $productPricing: ProductPricing(productCode == "BOOKING-3MA" && pricePlan == "QUARTERLY")
+    then
+        $productPricing.setPrice(180.0B);
+        $productPricing.setDiscount("")
+end
+
+rule "Product code is BOOKING-3MA and price plan YEARLY"
+    when
+        $productPricing: ProductPricing(productCode == "BOOKING-3MA", pricePlan == "YEARLY")
+    then
+        $productPricing.setPrice(400.0B);
+        $productPricing.setDiscount("")
+end
+
+rule "Product code is BOOKING-3MA and price plan YEARLY and promotion code KLARA"
+    when
+        $productPricing: ProductPricing(productCode == "BOOKING-3MA", pricePlan == "YEARLY", promotionCode == "KLARA")
+    then
+        $productPricing.setPrice(355.0B);
+        $productPricing.setDiscount("11%")
+end
+
+/*****************************************************************
+ *
+ * GENERAL RULE FOR UNKNOWN PRODUCTs
+ *
+ ***************************************************************/
+
+rule "Price plan is MONTHLY"
+salience 5
+    when
+        $productPricing: ProductPricing(productCode not contains "POS" && productCode not contains "BOOKING" && pricePlan == "MONTHLY")
+    then
+        $productPricing.setPrice(39.0B);
+end
+
+rule "Price plan is MONTHLY and LOGISTICS"
+    when
+        $productPricing: ProductPricing(pricePlan == "MONTHLY", productCode contains "LOGISTICS")
+    then
+        $productPricing.setPrice(50.0B);
+end
+
+rule "Price plan is QUARTERLY and LOGISTICS"
+    when
+        $productPricing: ProductPricing(pricePlan == "QUARTERLY", productCode contains "LOGISTICS")
+    then
+        $productPricing.setPrice(125.0B);
+end
+
+rule "Price plan is YEARLY and LOGISTICS"
+    when
+        $productPricing: ProductPricing(pricePlan == "YEARLY", productCode contains "LOGISTICS")
+    then
+        $productPricing.setPrice(450.0B);
+end
+
+rule "Price plan is QUARTERLY"
+salience 5
+    when
+        $productPricing: ProductPricing(pricePlan == "QUARTERLY")
+    then
+        $productPricing.setPrice(125.0B);
+end
+
+rule "Price plan is YEARLY"
+salience 5
+    when
+        $productPricing: ProductPricing(pricePlan == "YEARLY")
+    then
+        $productPricing.setPrice(450.0B);
+end
+
+
+rule "Product is ValiantBanking and Customer legal form is EU and price plan is yearly"
+    when
+        $productPricing: ProductPricing(pricePlan == "YEARLY", productCode == "ValiantBanking");
+        $customer: CustomerPricingModel(legalForm == "EU");
+    then
+        $productPricing.setPrice(359.15B);
+        $productPricing.setTestingDuration("P30D");
+end
+
+rule "Being customer since first day of year 2018 and price plan is SINGLE and Product is PrintAndSend"
+    when
+        $productPricing: ProductPricing(pricePlan == "SINGLE", productCode == "PrintAndSend")
+        $customer: CustomerPricingModel(customerSinceDate >= "1-Jan-2018")
+    then
+        $productPricing.setPrice(1.25B)
+        $productPricing.setTestingDuration("P11D")
+end
+
+rule "There is a subscription for 'PrintAndSend' product, deduct for 'ValiantBanking' product"
+    when
+        $subscription: SubscriptionPricingModel(productCode == "PrintAndSend")
+        $productPricing: ProductPricing(productCode == "ValiantBanking")
+    then
+        $productPricing.setPrice(32.10B)
+end
+
+rule "Price excl. VAT for KLARA Business"
+    when
+        $customer: CustomerPricingModel(customerType == "Business")
+        $productPricing: ProductPricing()
+    then
+        $productPricing.setVatIncluded(false)
+end
+
+rule "Price incl. VAT for KLARA Home"
+    when
+        $customer: CustomerPricingModel(customerType == "Home")
+        $productPricing: ProductPricing()
+    then
+        $productPricing.setVatIncluded(true)
+end
+
+rule "VAT Rate for first quarter of 2019"
+    when
+        $productPricing: ProductPricing(requestDate >= "1-Jan-2019" && requestDate <= "31-Mar-2019")
+    then
+        $productPricing.setVatRate(0.05B)
+end
+
+rule "VAT Rate for second quarter of 2019"
+    when
+        $productPricing: ProductPricing(requestDate >= "1-Apr-2019" && requestDate <= "30-Jun-2019")
+    then
+        $productPricing.setVatRate(0.06B)
+end
+
+rule "Product trinhle"
+    when
+        $productPricing: ProductPricing(productCode == "trinhle")
+    then
+        $productPricing.setPrice(16.10B);
+        $productPricing.setVatIncluded(true);
+end
+
+/*****************************************************************
+ *
+ * TEST_PROMO
+ *
+ **
+ ***************************************************************/
+ 
+ /* Basic case: no promotion at all */
+rule "TEST_PROMO without promo code"
+    when
+        $productPricing: ProductPricing(productCode == "TEST_PROMO", pricePlan == "MONTHLY")
+    then
+        $productPricing.setPrice(100.0B)
+        $productPricing.setDiscount(null)
+end
+
+rule "TEST_PROMO not yet subscribe without promo code is KLARA"
+    when
+        $productPricing: ProductPricing(productCode == "TEST_PROMO", pricePlan == "MONTHLY", promotionCode == "KLARA")
+    then
+        $productPricing.setPrice(60.0B)
+        $productPricing.setDiscount("40%")
+end
+
+rule "TEST_PROMO subscribed without promo code is KLARA"
+    when
+        $productPricing: ProductPricing(productCode == "TEST_PROMO", pricePlan == "MONTHLY")
+        $subscription: SubscriptionPricingModel(productCode == "TEST_PROMO", promotionCode == "KLARA")        
+    then
+        $productPricing.setPrice(60.0B)
+        $productPricing.setDiscount("40%")
+end
+
+/*****************************************************************
+ *
+ * POS-1F
+ *
+ **
+ ***************************************************************/
+ 
+rule "POS-1F without promo code"
+    when
+        $productPricing: ProductPricing(productCode == "POS-1F", pricePlan == "SINGLE")
+    then
+        $productPricing.setPrice(1000.0B)
+        $productPricing.setDiscount(null)
+end
+
+rule "POS-1F not yet subscribe without promo code is KLARA"
+    when
+        $productPricing: ProductPricing(productCode == "POS-1F", pricePlan == "SINGLE", promotionCode == "KLARA")
+    then
+        $productPricing.setPrice(600.0B)
+        $productPricing.setDiscount("40%")
+end
+
+/*****************************************************************
+ *
+ * OB-LOHN
+ *
+ ***************************************************************/
+ 
+rule "Onboarding service 1000 unit without promo code"
+    when
+        $productPricing: ProductPricing(productCode == "OB-LOHN", pricePlan == "VOLUME", volume==1000)
+    then
+        $productPricing.setPrice(1000.0B)
+        $productPricing.setDiscount(null)
+end
+
+rule "Onboarding service 2000 unit without promo code"
+    when
+        $productPricing: ProductPricing(productCode == "OB-LOHN", pricePlan == "VOLUME", volume==2000)
+    then
+        $productPricing.setPrice(1800.0B)
+        $productPricing.setDiscount(null)
+end
+
+rule "Onboarding service not yet subscribe without promo code is KLARA"
+    when
+        $productPricing: ProductPricing(productCode == "OB-LOHN", pricePlan == "VOLUME", volume==1000, promotionCode == "KLARA")
+    then
+        $productPricing.setPrice(600.0B)
+        $productPricing.setDiscount("40%")
+end
+
